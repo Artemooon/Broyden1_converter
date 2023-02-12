@@ -106,7 +106,7 @@ class LowRankMatrix {
         let a = blas.ddot(n_ddot, getNdArrayData(d), 1, 0, v, 1, 0);
         // w = a * w * c;
         // daxpy = (int *n, d *da, d *dx, int *incx, d *dy, int *incy) in Python
-        w = blas.daxpy(w.size, a, getNdArrayData(c), 1, 0, getNdArrayData(w), 1, 0);
+        w = blas.daxpy(c.size, a, getNdArrayData(c), 1, 0, getNdArrayData(w), 1, 0);
       })
     console.log('www', w);
     return getNdArrayData(w);
@@ -179,7 +179,9 @@ class LowRankMatrix {
 
   append(c, d) {
     if (this.collapsed) {
-      this.collapsed = this.collapsed.add(c.slice(null, []).multiply(conj(getNdArrayData(d.slice([], null)))));
+      const reshaped_c = c.reshape(c.size, 1);
+      const reshaped_d = d.reshape(1, d.size);
+      this.collapsed = convertToNdArray(this.collapsed).add(reshaped_c.multiply(conj(getNdArrayData(reshaped_d))));
       return;
     }
     // concatenate two arrays!
@@ -196,12 +198,13 @@ class LowRankMatrix {
       return this.collapsed;
     }
 
-    console.log("self.alpha in __array__", this.alpha)
-    console.log("this.n in __array__", this.n)
     let Gm = identity(this.n).multiply(this.alpha);
-    console.log("Gm in __array__", Gm);
 
+    let loc_counter = 0;
     for (const [c, d] of arraysZip(this.cs, this.ds)) {
+      console.log("arraysZip(this.cs, this.ds)", arraysZip(this.cs, this.ds))
+      loc_counter += 1;
+      console.log("loc_counter", loc_counter);
       console.log("c", c);
       console.log("d", d);
       console.log("c.reshape([0, c.size], null))", c.reshape(c.size, 1));
@@ -217,7 +220,7 @@ class LowRankMatrix {
       console.log("Error after it!");
       console.log("GM", Gm);
       console.log("matricies_mult", matricies_mult)
-      Gm = Gm.add(matricies_mult);
+      Gm = array(Gm).add(array(matricies_mult));
       Gm = this.creatreMatrixFromArray(getNdArrayData(Gm),  Gm.selection.shape[0], Gm.selection.shape[1]);
       console.log("Gm final matrix!!!", Gm);
     }
@@ -227,36 +230,16 @@ class LowRankMatrix {
   multiplyMatricies(matrix1, matrix2) {
     const result_arr = []
     console.log("matrix1[0]", matrix1);
-    matrix1.map((arr1_item, idx) => {
+    matrix1.map((arr1_item) => {
       const temp_arr = []
-      console.log("matrix2[0]", matrix2[0]);
       matrix2[0].map(arr2_item => {
-        console.log("arr1_item[0]", arr1_item[0]);
-        console.log("arr2_item", arr2_item);
         temp_arr.push(arr1_item[0]*arr2_item);
       })
       result_arr.push(temp_arr);
     })
-    console.log("result_arr", result_arr);
     return result_arr;
   }
 
-  addMatricies(matrix1, matrix2) {
-    const result_arr = []
-    console.log("matrix1[0]", matrix1);
-    matrix1[0].map(arr1_item => {
-      const temp_arr = []
-      console.log("matrix2[0]", matrix2[0]);
-      matrix2[0].map(arr2_item => {
-        console.log("arr1_item[0]", arr1_item[0]);
-        console.log("arr2_item", arr2_item);
-        temp_arr.push(arr1_item[0]*arr2_item);
-      })
-      result_arr.push(temp_arr);
-    })
-    console.log("result_arr", result_arr);
-    return result_arr;
-  }
 
   collapse() {
     // Collapse the low-rank matrix to a full-rank one.
@@ -554,15 +537,10 @@ class BroydenFirst extends GenericBroyden {
   _update(x, f, dx, df, dx_norm, df_norm) {
 
     this._reduce() // reduce first to preserve secant condition
-    console.log("dx smal!!", dx);
     let v = this.Gm.rmatvec(dx);
     const gmMatvecData = this.Gm.matvec(df);
     // const c = dx.map((item, idx) => item - gmMatvecData[idx])
     const c = array(dx).subtract(gmMatvecData);
-    console.log("dx", dx);
-    console.log("this.Gm.matvec(df)", this.Gm.matvec(df));
-    console.log("C", c);
-    console.log("df", df);
     const d = array(v).divide(num_dot(df, v).selection.data[0]);
     console.log("Before hard divide!!");
 
@@ -844,7 +822,7 @@ function func(x) {
   return res
 }
 
-const x0 = [1.5, 1.5, 2.5];
+const x0 = [1.5, 1.5];
 const root = broyden1(func, x0);
 
 

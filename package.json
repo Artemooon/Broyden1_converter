@@ -5,5 +5,8 @@
     "mathjs": "^11.5.1",
     "numjs": "^0.16.1",
     "svd-js": "^1.1.1"
+  },
+  "devDependencies": {
+    "jest": "^29.4.2"
   }
 }
