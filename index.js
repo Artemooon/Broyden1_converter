@@ -1,6 +1,6 @@
 const {SVD} = require('svd-js');
-const {transpose, conj, qr, inv, norm, lusolve, dot, multiply, matrix, re} = require('mathjs');
-const { identity, zeros, array, dot: num_dot, reshape, NdArray, add} = require('numjs');
+const {transpose, conj, qr, inv, norm, lusolve, multiply} = require('mathjs');
+const { identity, zeros, array, dot, reshape, NdArray } = require('numjs');
 const blas = require('blas');
 
 function convertToNdArray(arr) {
@@ -156,7 +156,7 @@ class LowRankMatrix {
   matvec(v) {
     // Evaluate w = M v
     if (this.collapsed !== null) {
-      return num_dot(this.collapsed, v);
+      return dot(this.collapsed, v);
     }
     return LowRankMatrix._matvec(getNdArrayData(v), this.alpha, this.cs, this.ds);
   }
@@ -165,10 +165,9 @@ class LowRankMatrix {
     // Evaluate w = M^H v
     if (this.collapsed) {
       const collapsed = convertToNdArray(conj(transpose(this.collapsed)));
-      const v_data = getNdArrayData(v);
-      const v_matrix = this.creatreMatrixFromArray(v_data, v.selection.shape[0], v.selection.shape[1] || 1)
+      const v_matrix = v.valueOf();
 
-      const collapsed_matrix = this.creatreMatrixFromArray(getNdArrayData(collapsed), collapsed.selection.shape[0], collapsed.selection.shape[1])
+      const collapsed_matrix = collapsed.valueOf()
       return multiply(collapsed_matrix, v_matrix)
     }
     return LowRankMatrix._matvec(getNdArrayData(v), conj(this.alpha), this.ds, this.cs);
@@ -196,14 +195,14 @@ class LowRankMatrix {
       let reshaped_d = d.reshape(1, d.size);
       const conjed_d = conj(getNdArrayData(reshaped_d));
       reshaped_d = convertToNdArray(conjed_d).reshape(1, reshaped_d.size);
-      const c_matrix = this.creatreMatrixFromArray(getNdArrayData(reshaped_c), reshaped_c.selection.shape[0], reshaped_c.selection.shape[1]);
-      const d_matrix = this.creatreMatrixFromArray(getNdArrayData(reshaped_d), reshaped_d.selection.shape[0], reshaped_d.selection.shape[1]);
+      const c_matrix = reshaped_c.valueOf();
+      const d_matrix = reshaped_d.valueOf();
       const multiply_of_arrays = this.multiplyMatricies(c_matrix, d_matrix);
       const array_sum = convertToNdArray(this.collapsed).add(multiply_of_arrays);
-      this.collapsed = this.creatreMatrixFromArray(getNdArrayData(array_sum),  array_sum.selection.shape[0], array_sum.selection.shape[1])
+      this.collapsed = array_sum.valueOf()
       return;
     }
-    // concatenate two arrays!
+
     this.cs.push(c);
     this.ds.push(d);
     const cs_length = this.cs.length;
@@ -226,13 +225,13 @@ class LowRankMatrix {
 
       const reshaped_c = c.reshape(c.size, 1);
       const reshaped_d = d.reshape(1, d.size);
-      const c_matrix = this.creatreMatrixFromArray(getNdArrayData(reshaped_c), reshaped_c.selection.shape[0], reshaped_c.selection.shape[1])
-      const d_matrix = this.creatreMatrixFromArray(getNdArrayData(reshaped_d), reshaped_d.selection.shape[0], reshaped_d.selection.shape[1])
+      const c_matrix = reshaped_c.valueOf();
+      const d_matrix = reshaped_d.valueOf();
 
       const matricies_mult = this.multiplyMatricies(c_matrix, conj(d_matrix));
 
       Gm = array(Gm).add(array(matricies_mult));
-      Gm = this.creatreMatrixFromArray(getNdArrayData(Gm),  Gm.selection.shape[0], Gm.selection.shape[1]);
+      Gm = Gm.valueOf();
     }
     return Gm
   }
@@ -301,40 +300,31 @@ class LowRankMatrix {
       a = p - 2;
     }
 
-    if (this.cs.size) {
-      p = Math.min(p, this.cs.get(0));
+    if (this.cs.length) {
+      p = Math.min(p, this.cs[0].size);
     }
     a = Math.max(0, Math.min(a, p - 1));
 
-    let m = this.cs.size || 0;
+    let m = this.cs.length;
 
     if (m < p) {
       // nothing to do
       return;
     }
 
-    let C = transpose(this.cs);
-    let D = transpose(this.ds);
+    let C = transpose(this.cs.map(item => getNdArrayData(item)));
+    let D = transpose(this.ds.map(item => getNdArrayData(item)));
 
     let { Q, R } = qr(D);
     const RConj = conj(transpose(R));
 
-    C = dot(C, RConj);
+    C = dot(C, RConj).valueOf();
 
-    C = this.creatreMatrixFromArray(C.selection.data, C.selection.shape[0], C.selection.shape[1]);
     let { u, q, v } = SVD(C);
 
-
-    C = this.creatreMatrixFromArray(array(C).selection.data, array(C).selection.shape[0], array(C).selection.shape[1]);
-    v = this.creatreMatrixFromArray(array(v).selection.data, array(v).selection.shape[0], array(v).selection.shape[1]);
-
-    C = dot(C, inv(v));
-    D = this.creatreMatrixFromArray(array(Q).selection.data, array(Q).selection.shape[0], array(Q).selection.shape[1]);
-    D = dot(D, conj(transpose(v)));
-
-
-    C = this.creatreMatrixFromArray(array(C).selection.data, array(C).selection.shape[0], array(C).selection.shape[1]);
-    D = this.creatreMatrixFromArray(array(D).selection.data, array(D).selection.shape[0], array(D).selection.shape[1]);
+    C = dot(C, inv(v)).valueOf();
+    D = Q.valueOf();
+    D = dot(D, conj(transpose(v))).valueOf();
 
 
     for (let k = 0; k < a; k++) {
@@ -346,14 +336,6 @@ class LowRankMatrix {
     this.ds.splice(0, a);
   }
 
-  creatreMatrixFromArray(array, rows, columns) {
-    const matrix = [];
-    const elementsPerRow = columns;
-    for (let i = 0; i < rows * columns; i += elementsPerRow) {
-      matrix.push(array.slice(i, i + elementsPerRow));
-    }
-    return matrix;
-  }
 }
 
 class Jacobian {
@@ -426,11 +408,6 @@ class GenericBroyden extends Jacobian {
       }
     }
     return this;
-  }
-
-
-  calculateMatrix(f, s, d = 1) {
-    return f.map((i, idx) => i + d*s[idx])
   }
 
   update(x, f) {
@@ -537,7 +514,7 @@ class BroydenFirst extends GenericBroyden {
     const gmMatvecData = this.Gm.matvec(df);
     // const c = dx.map((item, idx) => item - gmMatvecData[idx])
     const c = array(dx).subtract(gmMatvecData);
-    const d = array(v).divide(num_dot(df, v).selection.data[0]);
+    const d = array(v).divide(dot(df, v).selection.data[0]);
 
     this.Gm.append(c, d);
   }
@@ -623,7 +600,6 @@ function nonlin_solve(F, x0, jacobian='broyden1', iter=null, verbose=false,
                       maxiter=null, f_tol=null, f_rtol=null, x_tol=null, x_rtol=null,
                       tol_norm=null, line_search='armijo', callback=null,
                       full_output=true, raise_exception=true) {
-  //let tol_norm = tol_norm || maxnorm;
   tol_norm = tol_norm ? tol_norm : maxnorm;
   let condition = new TerminationCondition(f_tol, f_rtol, x_tol, x_rtol, iter, tol_norm);
   x0 = _as_inexact(x0);
@@ -648,13 +624,13 @@ function nonlin_solve(F, x0, jacobian='broyden1', iter=null, verbose=false,
   let eta = 0.001;
 
 
-  let status_failed = false;
+  let status_failed = true;
   let status;
 
   for (let n = 0; n < maxiter; n++) {
     status = condition.check(Fx, x, dx);
     if (status) {
-      status_failed = true;
+      status_failed = false;
       break;
     }
 
@@ -703,12 +679,12 @@ function nonlin_solve(F, x0, jacobian='broyden1', iter=null, verbose=false,
 
     // Print status
     if (verbose) {
-        console.log(n, tol_norm(Fx), s, "VERBOSEEE")
+        console.log("verbose", n, tol_norm(Fx), s);
     }
   }
   if (status_failed) {
       if (raise_exception) {
-          // throw new Error(_array_like(x, x0));
+          throw new Error(`NoConvergence: ${_array_like(x, x0)}`);
       } else {
           status = 2;
       }
@@ -717,7 +693,7 @@ function nonlin_solve(F, x0, jacobian='broyden1', iter=null, verbose=false,
   if (full_output) {
     const info = {
       'nit': condition.iteration,
-      'fun': Fx,
+      'fun': getNdArrayData(Fx),
       'status': status,
       'success': status === 1,
       'message': {
@@ -790,7 +766,7 @@ function scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0) {
   return [null, phi_a1];
 }
 
-function broyden1(F, xin, iter=null, alpha=null, reduction_method='restart',
+function broyden1(F, xin, iter=null, alpha=null, reduction_method='svd',
                   max_rank=null, verbose=false, maxiter=null, f_tol=null, f_rtol=null, x_tol=null, x_rtol=null,
                   tol_norm=null, line_search='armijo', callback=null, options) {
   const jac = new BroydenFirst(alpha, reduction_method, max_rank);
@@ -799,14 +775,5 @@ function broyden1(F, xin, iter=null, alpha=null, reduction_method='restart',
       callback)
 }
 
-// TEST
-function func(x) {
-  const res = array([x[0]**2 + x[1]**2 - 1, x[0] - x[1] - 1])
-  return res
-}
-
-const x0 = array([3.2, 2]);
-const root = broyden1(func, x0);
-
-
-console.log("root", root);
+// export broyden1 function
+module.exports = broyden1;
