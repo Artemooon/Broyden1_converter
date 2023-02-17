@@ -1,11 +1,11 @@
-const broyden1 = require("./index");
+import broyden1 from "./index.js";
 
 function func(x) {
-  return [x[0]**2 + x[1]**2 - 1, x[0] - x[1] - 1]
+  return [(x-3)**2]
 }
 
-const x0 = [1, 1];
-const root = broyden1(func, x0, null, null, 'simple');
+const x0 = 2;
+const root = broyden1(func, x0, null, null, 'restart');
 
 
 console.log("root", root);

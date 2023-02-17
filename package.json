@@ -1,9 +1,10 @@
 {
+  "type": "module",
   "dependencies": {
+    "@d4c/numjs": "^0.17.34",
     "blas": "^0.2.7",
     "blasjs": "^1.0.15",
     "mathjs": "^11.5.1",
-    "numjs": "^0.16.1",
     "svd-js": "^1.1.1"
   }
 }

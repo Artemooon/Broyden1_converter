@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <script src="bundle.js"></script>
+    <script>
+      function func(x) {
+        return [x[0]**2 + x[1]**2 - 1, x[0] - x[1] - 1]
+      }
+
+      const x0 = [1, 1];
+      const root = window.broyden1(func, x0);
+
+      console.log("root", root);
+    </script>
+</body>
+</html>

@@ -1,7 +1,16 @@
-const {SVD} = require('svd-js');
-const {transpose, conj, qr, inv, norm, lusolve, multiply} = require('mathjs');
-const { identity, zeros, array, dot, reshape, NdArray } = require('numjs');
+const svdJs = require('svd-js');
+const {SVD} = svdJs;
+const mathJs = require('mathjs');
+const {transpose, conj, qr, inv, norm, lusolve, multiply} = mathJs;
+const numJs = require('@d4c/numjs').default;
+const { identity, zeros, array, dot, reshape, NdArray } = numJs;
 const blas = require('blas');
+
+module.exports = svdJs;
+module.exports = mathJs;
+module.exports = numJs;
+module.exports = blas;
+
 
 function convertToNdArray(arr) {
   if (arr instanceof NdArray) {
@@ -766,7 +775,7 @@ function scalar_search_armijo(phi, phi0, derphi0, c1=1e-4, alpha0=1, amin=0) {
   return [null, phi_a1];
 }
 
-function broyden1(F, xin, iter=null, alpha=null, reduction_method='svd',
+function broyden1(F, xin, iter=null, alpha=null, reduction_method='restart',
                   max_rank=null, verbose=false, maxiter=null, f_tol=null, f_rtol=null, x_tol=null, x_rtol=null,
                   tol_norm=null, line_search='armijo', callback=null, options) {
   const jac = new BroydenFirst(alpha, reduction_method, max_rank);
@@ -776,4 +785,4 @@ function broyden1(F, xin, iter=null, alpha=null, reduction_method='svd',
 }
 
 // export broyden1 function
-module.exports = broyden1;
+window.broyden1 = broyden1;
